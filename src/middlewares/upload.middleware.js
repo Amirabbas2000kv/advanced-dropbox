@@ -2,9 +2,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const uploadConfig = require('../config/upload.config');
 
 const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads');
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -19,9 +19,20 @@ const storage = multer.diskStorage({
   },
 });
 
+const fileFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (uploadConfig.blockedExtensions.includes(ext)) {
+    const err = new Error(`File type "${ext}" is not allowed`);
+    err.code = 'BLOCKED_FILE_TYPE';
+    return cb(err);
+  }
+  cb(null, true);
+};
+
 const upload = multer({
   storage,
-  limits: { fileSize: MAX_FILE_SIZE },
+  fileFilter,
+  limits: { fileSize: uploadConfig.maxFileSize },
 }).single('file');
 
 module.exports = (req, res, next) => {
@@ -31,6 +42,9 @@ module.exports = (req, res, next) => {
         return res.status(413).json({ error: 'File is too large (max 50 MB)' });
       }
       return res.status(400).json({ error: err.message });
+    }
+    if (err && err.code === 'BLOCKED_FILE_TYPE') {
+      return res.status(415).json({ error: err.message });
     }
     if (err) {
       console.error('Upload error:', err);

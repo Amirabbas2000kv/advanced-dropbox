@@ -10,6 +10,16 @@ exports.upload = async (req, res) => {
       return res.status(400).json({ error: 'No file uploaded. Send it in a field named "file"' });
     }
 
+    // Storage quota check
+    const owner = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { storageUsed: true, storageLimit: true },
+    });
+    if (owner.storageUsed + req.file.size > owner.storageLimit) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(413).json({ error: 'Storage quota exceeded' });
+    }
+
     // Optional target folder (sent as a form field named "folderId")
     let folderId = null;
     if (req.body.folderId) {
@@ -62,6 +72,25 @@ exports.list = async (req, res) => {
     return res.json({ count: files.length, files });
   } catch (err) {
     console.error('List error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.storage = async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { storageUsed: true, storageLimit: true },
+    });
+
+    return res.json({
+      used: user.storageUsed,
+      limit: user.storageLimit,
+      remaining: user.storageLimit - user.storageUsed,
+      percent: Number(((user.storageUsed / user.storageLimit) * 100).toFixed(2)),
+    });
+  } catch (err) {
+    console.error('Storage error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
