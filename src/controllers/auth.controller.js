@@ -83,3 +83,7 @@ exports.login = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+exports.me = async (req, res) => {
+  return res.json({ user: req.user });
+};
