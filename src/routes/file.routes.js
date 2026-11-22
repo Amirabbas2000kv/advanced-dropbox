@@ -8,4 +8,7 @@ const router = express.Router();
 // Order matters: first check the token, then receive the file
 router.post('/upload', authMiddleware, uploadMiddleware, fileController.upload);
 
+router.get('/', authMiddleware, fileController.list);
+router.get('/:id/download', authMiddleware, fileController.download);
+
 module.exports = router;

@@ -1,5 +1,6 @@
 const fs = require('fs');
 const prisma = require('../config/db');
+const path = require('path');
 
 exports.upload = async (req, res) => {
   try {
@@ -30,6 +31,50 @@ exports.upload = async (req, res) => {
     // If the database failed, remove the file from disk so nothing is orphaned
     if (req.file) fs.unlink(req.file.path, () => {});
     console.error('Upload error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads');
+
+exports.list = async (req, res) => {
+  try {
+    const files = await prisma.file.findMany({
+      where: { userId: req.user.id },
+      select: { id: true, name: true, mimeType: true, size: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return res.json({ count: files.length, files });
+  } catch (err) {
+    console.error('List error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.download = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid file id' });
+    }
+
+    // Only find the file if it belongs to the logged-in user
+    const file = await prisma.file.findFirst({
+      where: { id, userId: req.user.id },
+    });
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    const filePath = path.join(UPLOAD_ROOT, String(req.user.id), file.storedName);
+    return res.download(filePath, file.name, (err) => {
+      if (err && !res.headersSent) {
+        return res.status(404).json({ error: 'File is missing on disk' });
+      }
+    });
+  } catch (err) {
+    console.error('Download error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
