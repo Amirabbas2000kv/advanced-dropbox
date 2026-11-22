@@ -19,6 +19,7 @@ model User {
   files          File[]
   folders        Folder[]
   uploadSessions UploadSession[]
+  shareLinks     ShareLink[]
 }
 
 model Folder {
@@ -37,18 +38,19 @@ model Folder {
 }
 
 model File {
-  id         Int       @id @default(autoincrement())
+  id         Int         @id @default(autoincrement())
   name       String
-  storedName String    @unique
+  storedName String      @unique
   mimeType   String
   size       Int
   userId     Int
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   folderId   Int?
-  folder     Folder?   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  folder     Folder?     @relation(fields: [folderId], references: [id], onDelete: Cascade)
   deletedAt  DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  shareLinks ShareLink[]
 
   @@index([userId, folderId])
   @@index([userId, deletedAt])
@@ -65,6 +67,20 @@ model UploadSession {
   totalChunks Int
   folderId    Int?
   createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model ShareLink {
+  id            Int       @id @default(autoincrement())
+  token         String    @unique
+  fileId        Int
+  file          File      @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  userId        Int
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt     DateTime?
+  downloadCount Int       @default(0)
+  createdAt     DateTime  @default(now())
 
   @@index([userId])
 }

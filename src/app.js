@@ -8,6 +8,8 @@ const fileRoutes = require('./routes/file.routes');
 const folderRoutes = require('./routes/folder.routes');
 const chunkRoutes = require('./routes/chunk.routes');
 const searchRoutes = require('./routes/search.routes');
+const shareRoutes = require('./routes/share.routes');
+const shareController = require('./controllers/share.controller');
 const { notFound, errorHandler } = require('./middlewares/error.middleware');
 
 const app = express();
@@ -31,12 +33,16 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Public route (no login): download through a share link
+app.get('/api/public/:token', shareController.publicDownload);
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/uploads', chunkRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/shares', shareRoutes);
 
 // 404 handler, then the central error handler (MUST be last)
 app.use(notFound);
