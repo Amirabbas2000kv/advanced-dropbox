@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth.routes');
 const fileRoutes = require('./routes/file.routes');
 const folderRoutes = require('./routes/folder.routes');
 const chunkRoutes = require('./routes/chunk.routes');
+const searchRoutes = require('./routes/search.routes');
 const { notFound, errorHandler } = require('./middlewares/error.middleware');
 
 const app = express();
@@ -35,6 +36,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/folders', folderRoutes);
 app.use('/api/uploads', chunkRoutes);
+app.use('/api/search', searchRoutes);
 
 // 404 handler, then the central error handler (MUST be last)
 app.use(notFound);
