@@ -1,5 +1,9 @@
+const fs = require('fs');
+const path = require('path');
 const prisma = require('../config/db');
 const logger = require('../utils/logger');
+
+const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads');
 
 // Parse an optional id from body/params. Returns null for root, NaN for invalid.
 const parseOptionalId = (value) => {
@@ -177,6 +181,64 @@ exports.move = async (req, res) => {
     });
 
     return res.json({ message: 'Folder moved successfully', folder: updated });
+  } catch (err) {
+    logger.error(err.stack || err.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// DELETE /api/folders/:id  ->  deletes the folder, all subfolders and all files inside (permanent)
+exports.remove = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid folder id' });
+    }
+
+    const folder = await prisma.folder.findFirst({ where: { id, userId: req.user.id } });
+    if (!folder) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
+    // 1) Collect this folder and ALL its subfolders (level by level)
+    const folderIds = [folder.id];
+    let level = [folder.id];
+    while (level.length > 0) {
+      const children = await prisma.folder.findMany({
+        where: { userId: req.user.id, parentId: { in: level } },
+        select: { id: true },
+      });
+      level = children.map((c) => c.id);
+      folderIds.push(...level);
+    }
+
+    // 2) Find every file inside (including files that are in the trash)
+    const files = await prisma.file.findMany({
+      where: { userId: req.user.id, folderId: { in: folderIds } },
+      select: { storedName: true, size: true },
+    });
+    const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+
+    // 3) Delete the folder (Cascade removes subfolders, file records and share links)
+    //    and free the storage, in ONE transaction
+    await prisma.$transaction([
+      prisma.folder.delete({ where: { id: folder.id } }),
+      prisma.user.update({
+        where: { id: req.user.id },
+        data: { storageUsed: { decrement: totalSize } },
+      }),
+    ]);
+
+    // 4) Remove the physical files from disk
+    for (const f of files) {
+      fs.unlink(path.join(UPLOAD_ROOT, String(req.user.id), f.storedName), () => {});
+    }
+
+    return res.json({
+      message: 'Folder deleted successfully',
+      deletedFolders: folderIds.length,
+      deletedFiles: files.length,
+    });
   } catch (err) {
     logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
