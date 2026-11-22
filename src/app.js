@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const authRoutes = require('./routes/auth.routes');
 
 const app = express();
 
@@ -19,6 +20,9 @@ app.get('/api/health', (req, res) => {
     time: new Date().toISOString(),
   });
 });
+
+// API routes
+app.use('/api/auth', authRoutes);
 
 // 404 handler
 app.use((req, res) => {
