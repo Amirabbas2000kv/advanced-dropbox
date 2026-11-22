@@ -1,11 +1,26 @@
 const fs = require('fs');
-const prisma = require('../config/db');
 const path = require('path');
+const prisma = require('../config/db');
+
+const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads');
 
 exports.upload = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded. Send it in a field named "file"' });
+    }
+
+    // Optional target folder (sent as a form field named "folderId")
+    let folderId = null;
+    if (req.body.folderId) {
+      folderId = Number(req.body.folderId);
+      const folder = Number.isInteger(folderId)
+        ? await prisma.folder.findFirst({ where: { id: folderId, userId: req.user.id } })
+        : null;
+      if (!folder) {
+        fs.unlink(req.file.path, () => {});
+        return res.status(404).json({ error: 'Target folder not found' });
+      }
     }
 
     // Save file info and update the user's used storage in ONE transaction
@@ -17,8 +32,9 @@ exports.upload = async (req, res) => {
           mimeType: req.file.mimetype,
           size: req.file.size,
           userId: req.user.id,
+          folderId,
         },
-        select: { id: true, name: true, mimeType: true, size: true, createdAt: true },
+        select: { id: true, name: true, mimeType: true, size: true, folderId: true, createdAt: true },
       }),
       prisma.user.update({
         where: { id: req.user.id },
@@ -35,13 +51,11 @@ exports.upload = async (req, res) => {
   }
 };
 
-const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads');
-
 exports.list = async (req, res) => {
   try {
     const files = await prisma.file.findMany({
       where: { userId: req.user.id },
-      select: { id: true, name: true, mimeType: true, size: true, createdAt: true },
+      select: { id: true, name: true, mimeType: true, size: true, folderId: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
 
