@@ -66,9 +66,11 @@ async function main() {
   const downloaded = Buffer.from(await res.arrayBuffer());
   check('downloaded file has the same SHA-256 as the original', sha256(downloaded) === originalHash);
 
-  // Clean up: delete the test file (also frees the quota)
+  // Clean up: move to trash, then delete permanently (frees the quota)
   res = await fetch(`${BASE}/files/${done.file.id}`, { method: 'DELETE', headers: auth });
-  check('test file deleted', res.status === 200);
+  check('test file moved to trash', res.status === 200);
+  res = await fetch(`${BASE}/files/${done.file.id}/permanent`, { method: 'DELETE', headers: auth });
+  check('test file deleted permanently', res.status === 200);
 
   // ---- Test 3: complete with missing chunks must fail ----
   res = await fetch(`${BASE}/uploads/init`, {

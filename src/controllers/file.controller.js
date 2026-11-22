@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const prisma = require('../config/db');
+const logger = require('../utils/logger');
 
 const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads');
 
@@ -56,7 +57,7 @@ exports.upload = async (req, res) => {
   } catch (err) {
     // If the database failed, remove the file from disk so nothing is orphaned
     if (req.file) fs.unlink(req.file.path, () => {});
-    console.error('Upload error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -64,14 +65,14 @@ exports.upload = async (req, res) => {
 exports.list = async (req, res) => {
   try {
     const files = await prisma.file.findMany({
-      where: { userId: req.user.id },
+      where: { userId: req.user.id, deletedAt: null },
       select: { id: true, name: true, mimeType: true, size: true, folderId: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
     });
 
     return res.json({ count: files.length, files });
   } catch (err) {
-    console.error('List error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -90,7 +91,7 @@ exports.storage = async (req, res) => {
       percent: Number(((user.storageUsed / user.storageLimit) * 100).toFixed(2)),
     });
   } catch (err) {
-    console.error('Storage error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -102,9 +103,9 @@ exports.download = async (req, res) => {
       return res.status(400).json({ error: 'Invalid file id' });
     }
 
-    // Only find the file if it belongs to the logged-in user
+    // Only find the file if it belongs to the logged-in user and is not in the trash
     const file = await prisma.file.findFirst({
-      where: { id, userId: req.user.id },
+      where: { id, userId: req.user.id, deletedAt: null },
     });
     if (!file) {
       return res.status(404).json({ error: 'File not found' });
@@ -117,11 +118,12 @@ exports.download = async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Download error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
 
+// DELETE /api/files/:id  ->  move to trash (soft delete)
 exports.remove = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -129,15 +131,85 @@ exports.remove = async (req, res) => {
       return res.status(400).json({ error: 'Invalid file id' });
     }
 
-    // Only find the file if it belongs to the logged-in user
     const file = await prisma.file.findFirst({
-      where: { id, userId: req.user.id },
+      where: { id, userId: req.user.id, deletedAt: null },
     });
     if (!file) {
       return res.status(404).json({ error: 'File not found' });
     }
 
-    // Delete the record and free the storage in ONE transaction
+    await prisma.file.update({
+      where: { id: file.id },
+      data: { deletedAt: new Date() },
+    });
+
+    return res.json({ message: 'File moved to trash' });
+  } catch (err) {
+    logger.error(err.stack || err.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// GET /api/files/trash
+exports.trash = async (req, res) => {
+  try {
+    const files = await prisma.file.findMany({
+      where: { userId: req.user.id, deletedAt: { not: null } },
+      select: { id: true, name: true, mimeType: true, size: true, folderId: true, deletedAt: true },
+      orderBy: { deletedAt: 'desc' },
+    });
+
+    return res.json({ count: files.length, files });
+  } catch (err) {
+    logger.error(err.stack || err.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// POST /api/files/:id/restore
+exports.restore = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid file id' });
+    }
+
+    const file = await prisma.file.findFirst({
+      where: { id, userId: req.user.id, deletedAt: { not: null } },
+    });
+    if (!file) {
+      return res.status(404).json({ error: 'File not found in trash' });
+    }
+
+    const restored = await prisma.file.update({
+      where: { id: file.id },
+      data: { deletedAt: null },
+      select: { id: true, name: true, folderId: true },
+    });
+
+    return res.json({ message: 'File restored successfully', file: restored });
+  } catch (err) {
+    logger.error(err.stack || err.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// DELETE /api/files/:id/permanent  ->  remove for good (record + disk + quota)
+exports.permanentDelete = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid file id' });
+    }
+
+    // Only files that are already in the trash can be deleted permanently
+    const file = await prisma.file.findFirst({
+      where: { id, userId: req.user.id, deletedAt: { not: null } },
+    });
+    if (!file) {
+      return res.status(404).json({ error: 'File not found in trash' });
+    }
+
     await prisma.$transaction([
       prisma.file.delete({ where: { id: file.id } }),
       prisma.user.update({
@@ -150,9 +222,9 @@ exports.remove = async (req, res) => {
     const filePath = path.join(UPLOAD_ROOT, String(req.user.id), file.storedName);
     fs.unlink(filePath, () => {});
 
-    return res.json({ message: 'File deleted successfully' });
+    return res.json({ message: 'File permanently deleted' });
   } catch (err) {
-    console.error('Delete error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -169,7 +241,7 @@ exports.rename = async (req, res) => {
       return res.status(400).json({ error: 'New name is required' });
     }
 
-    const file = await prisma.file.findFirst({ where: { id, userId: req.user.id } });
+    const file = await prisma.file.findFirst({ where: { id, userId: req.user.id, deletedAt: null } });
     if (!file) {
       return res.status(404).json({ error: 'File not found' });
     }
@@ -182,7 +254,7 @@ exports.rename = async (req, res) => {
 
     return res.json({ message: 'File renamed successfully', file: updated });
   } catch (err) {
-    console.error('Rename file error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -201,7 +273,7 @@ exports.move = async (req, res) => {
       return res.status(400).json({ error: 'Invalid folderId' });
     }
 
-    const file = await prisma.file.findFirst({ where: { id, userId: req.user.id } });
+    const file = await prisma.file.findFirst({ where: { id, userId: req.user.id, deletedAt: null } });
     if (!file) {
       return res.status(404).json({ error: 'File not found' });
     }
@@ -221,7 +293,7 @@ exports.move = async (req, res) => {
 
     return res.json({ message: 'File moved successfully', file: updated });
   } catch (err) {
-    console.error('Move file error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };

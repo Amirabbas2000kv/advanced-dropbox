@@ -37,19 +37,21 @@ model Folder {
 }
 
 model File {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   name       String
-  storedName String   @unique
+  storedName String    @unique
   mimeType   String
   size       Int
   userId     Int
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   folderId   Int?
-  folder     Folder?  @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  folder     Folder?   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([userId, folderId])
+  @@index([userId, deletedAt])
 }
 
 model UploadSession {

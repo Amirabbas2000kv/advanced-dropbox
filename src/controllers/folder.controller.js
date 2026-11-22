@@ -1,6 +1,7 @@
 const prisma = require('../config/db');
+const logger = require('../utils/logger');
 
-// Parse an optional id from body/query. Returns null for root, NaN for invalid.
+// Parse an optional id from body/params. Returns null for root, NaN for invalid.
 const parseOptionalId = (value) => {
   if (value === undefined || value === null || value === '' || value === 'null') return null;
   const n = Number(value);
@@ -44,12 +45,12 @@ exports.create = async (req, res) => {
 
     return res.status(201).json({ message: 'Folder created successfully', folder });
   } catch (err) {
-    console.error('Create folder error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
 
-// List the content of one folder (or the root when no folderId is given)
+// List the content of one folder (or the root when no id is given)
 exports.content = async (req, res) => {
   try {
     const folderId = parseOptionalId(req.params.id);
@@ -75,7 +76,7 @@ exports.content = async (req, res) => {
         orderBy: { name: 'asc' },
       }),
       prisma.file.findMany({
-        where: { userId: req.user.id, folderId },
+        where: { userId: req.user.id, folderId, deletedAt: null },
         select: { id: true, name: true, mimeType: true, size: true, createdAt: true },
         orderBy: { createdAt: 'desc' },
       }),
@@ -83,7 +84,7 @@ exports.content = async (req, res) => {
 
     return res.json({ current, folders, files });
   } catch (err) {
-    console.error('Folder content error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -120,7 +121,7 @@ exports.rename = async (req, res) => {
 
     return res.json({ message: 'Folder renamed successfully', folder: updated });
   } catch (err) {
-    console.error('Rename folder error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -177,7 +178,7 @@ exports.move = async (req, res) => {
 
     return res.json({ message: 'Folder moved successfully', folder: updated });
   } catch (err) {
-    console.error('Move folder error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
