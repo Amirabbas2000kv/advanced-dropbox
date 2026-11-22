@@ -87,3 +87,97 @@ exports.content = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+exports.rename = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid folder id' });
+    }
+    if (!name) {
+      return res.status(400).json({ error: 'New name is required' });
+    }
+
+    const folder = await prisma.folder.findFirst({ where: { id, userId: req.user.id } });
+    if (!folder) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
+    const duplicate = await prisma.folder.findFirst({
+      where: { name, parentId: folder.parentId, userId: req.user.id, NOT: { id: folder.id } },
+    });
+    if (duplicate) {
+      return res.status(409).json({ error: 'A folder with this name already exists here' });
+    }
+
+    const updated = await prisma.folder.update({
+      where: { id: folder.id },
+      data: { name },
+      select: { id: true, name: true, parentId: true, updatedAt: true },
+    });
+
+    return res.json({ message: 'Folder renamed successfully', folder: updated });
+  } catch (err) {
+    console.error('Rename folder error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.move = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid folder id' });
+    }
+
+    // parentId: number = target folder, null = root
+    const raw = req.body.parentId;
+    const parentId = raw === null || raw === undefined ? null : Number(raw);
+    if (parentId !== null && !Number.isInteger(parentId)) {
+      return res.status(400).json({ error: 'Invalid parentId' });
+    }
+
+    const folder = await prisma.folder.findFirst({ where: { id, userId: req.user.id } });
+    if (!folder) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
+    if (parentId !== null) {
+      const target = await prisma.folder.findFirst({ where: { id: parentId, userId: req.user.id } });
+      if (!target) {
+        return res.status(404).json({ error: 'Target folder not found' });
+      }
+
+      // Cycle check: walk up from the target. If we meet the folder itself, the move is illegal.
+      let cursor = target;
+      while (cursor) {
+        if (cursor.id === folder.id) {
+          return res.status(400).json({ error: 'Cannot move a folder into itself or its subfolder' });
+        }
+        cursor = cursor.parentId
+          ? await prisma.folder.findUnique({ where: { id: cursor.parentId } })
+          : null;
+      }
+    }
+
+    const duplicate = await prisma.folder.findFirst({
+      where: { name: folder.name, parentId, userId: req.user.id, NOT: { id: folder.id } },
+    });
+    if (duplicate) {
+      return res.status(409).json({ error: 'A folder with this name already exists in the target' });
+    }
+
+    const updated = await prisma.folder.update({
+      where: { id: folder.id },
+      data: { parentId },
+      select: { id: true, name: true, parentId: true, updatedAt: true },
+    });
+
+    return res.json({ message: 'Folder moved successfully', folder: updated });
+  } catch (err) {
+    console.error('Move folder error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};

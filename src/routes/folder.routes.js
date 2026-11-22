@@ -8,4 +8,7 @@ router.post('/', authMiddleware, folderController.create);
 router.get('/', authMiddleware, folderController.content);
 router.get('/:id', authMiddleware, folderController.content);
 
+router.patch('/:id/rename', authMiddleware, folderController.rename);
+router.patch('/:id/move', authMiddleware, folderController.move);
+
 module.exports = router;

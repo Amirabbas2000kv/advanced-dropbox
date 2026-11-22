@@ -127,3 +127,72 @@ exports.remove = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+exports.rename = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid file id' });
+    }
+    if (!name) {
+      return res.status(400).json({ error: 'New name is required' });
+    }
+
+    const file = await prisma.file.findFirst({ where: { id, userId: req.user.id } });
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    const updated = await prisma.file.update({
+      where: { id: file.id },
+      data: { name },
+      select: { id: true, name: true, folderId: true, updatedAt: true },
+    });
+
+    return res.json({ message: 'File renamed successfully', file: updated });
+  } catch (err) {
+    console.error('Rename file error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+exports.move = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid file id' });
+    }
+
+    // folderId: number = target folder, null = root
+    const raw = req.body.folderId;
+    const folderId = raw === null || raw === undefined ? null : Number(raw);
+    if (folderId !== null && !Number.isInteger(folderId)) {
+      return res.status(400).json({ error: 'Invalid folderId' });
+    }
+
+    const file = await prisma.file.findFirst({ where: { id, userId: req.user.id } });
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    if (folderId !== null) {
+      const target = await prisma.folder.findFirst({ where: { id: folderId, userId: req.user.id } });
+      if (!target) {
+        return res.status(404).json({ error: 'Target folder not found' });
+      }
+    }
+
+    const updated = await prisma.file.update({
+      where: { id: file.id },
+      data: { folderId },
+      select: { id: true, name: true, folderId: true, updatedAt: true },
+    });
+
+    return res.json({ message: 'File moved successfully', file: updated });
+  } catch (err) {
+    console.error('Move file error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
