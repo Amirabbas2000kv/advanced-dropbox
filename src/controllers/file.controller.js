@@ -78,3 +78,38 @@ exports.download = async (req, res) => {
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+exports.remove = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid file id' });
+    }
+
+    // Only find the file if it belongs to the logged-in user
+    const file = await prisma.file.findFirst({
+      where: { id, userId: req.user.id },
+    });
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Delete the record and free the storage in ONE transaction
+    await prisma.$transaction([
+      prisma.file.delete({ where: { id: file.id } }),
+      prisma.user.update({
+        where: { id: req.user.id },
+        data: { storageUsed: { decrement: file.size } },
+      }),
+    ]);
+
+    // Remove the physical file (ignore error if it's already gone)
+    const filePath = path.join(UPLOAD_ROOT, String(req.user.id), file.storedName);
+    fs.unlink(filePath, () => {});
+
+    return res.json({ message: 'File deleted successfully' });
+  } catch (err) {
+    console.error('Delete error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
