@@ -212,14 +212,29 @@ exports.remove = async (req, res) => {
       folderIds.push(...level);
     }
 
-    // 2) Find every file inside (including files that are in the trash)
+    // 2) Find every file inside (including trashed files) and their old versions
     const files = await prisma.file.findMany({
       where: { userId: req.user.id, folderId: { in: folderIds } },
-      select: { storedName: true, size: true },
+      select: {
+        id: true,
+        storedName: true,
+        size: true,
+        versions: { select: { storedName: true, size: true } },
+      },
     });
-    const totalSize = files.reduce((sum, f) => sum + f.size, 0);
 
-    // 3) Delete the folder (Cascade removes subfolders, file records and share links)
+    const storedNames = [];
+    let totalSize = 0;
+    for (const f of files) {
+      storedNames.push(f.storedName);
+      totalSize += f.size;
+      for (const v of f.versions) {
+        storedNames.push(v.storedName);
+        totalSize += v.size;
+      }
+    }
+
+    // 3) Delete the folder (Cascade removes subfolders, files, versions and share links)
     //    and free the storage, in ONE transaction
     await prisma.$transaction([
       prisma.folder.delete({ where: { id: folder.id } }),
@@ -230,8 +245,8 @@ exports.remove = async (req, res) => {
     ]);
 
     // 4) Remove the physical files from disk
-    for (const f of files) {
-      fs.unlink(path.join(UPLOAD_ROOT, String(req.user.id), f.storedName), () => {});
+    for (const name of storedNames) {
+      fs.unlink(path.join(UPLOAD_ROOT, String(req.user.id), name), () => {});
     }
 
     return res.json({

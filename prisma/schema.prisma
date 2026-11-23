@@ -38,22 +38,37 @@ model Folder {
 }
 
 model File {
-  id         Int         @id @default(autoincrement())
-  name       String
-  storedName String      @unique
-  mimeType   String
-  size       Int
-  userId     Int
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  folderId   Int?
-  folder     Folder?     @relation(fields: [folderId], references: [id], onDelete: Cascade)
-  deletedAt  DateTime?
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-  shareLinks ShareLink[]
+  id             Int           @id @default(autoincrement())
+  name           String
+  storedName     String        @unique
+  mimeType       String
+  size           Int
+  currentVersion Int           @default(1)
+  userId         Int
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folderId       Int?
+  folder         Folder?       @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  deletedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  shareLinks     ShareLink[]
+  versions       FileVersion[]
 
   @@index([userId, folderId])
   @@index([userId, deletedAt])
+}
+
+model FileVersion {
+  id         Int      @id @default(autoincrement())
+  fileId     Int
+  file       File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  version    Int
+  storedName String   @unique
+  mimeType   String
+  size       Int
+  createdAt  DateTime @default(now())
+
+  @@unique([fileId, version])
 }
 
 model UploadSession {

@@ -194,7 +194,7 @@ exports.restore = async (req, res) => {
   }
 };
 
-// DELETE /api/files/:id/permanent  ->  remove for good (record + disk + quota)
+// DELETE /api/files/:id/permanent  ->  remove for good (record + disk + quota, including old versions)
 exports.permanentDelete = async (req, res) => {
   try {
     const id = Number(req.params.id);
@@ -205,22 +205,26 @@ exports.permanentDelete = async (req, res) => {
     // Only files that are already in the trash can be deleted permanently
     const file = await prisma.file.findFirst({
       where: { id, userId: req.user.id, deletedAt: { not: null } },
+      include: { versions: true },
     });
     if (!file) {
       return res.status(404).json({ error: 'File not found in trash' });
     }
 
+    const totalSize = file.size + file.versions.reduce((sum, v) => sum + v.size, 0);
+
     await prisma.$transaction([
       prisma.file.delete({ where: { id: file.id } }),
       prisma.user.update({
         where: { id: req.user.id },
-        data: { storageUsed: { decrement: file.size } },
+        data: { storageUsed: { decrement: totalSize } },
       }),
     ]);
 
-    // Remove the physical file (ignore error if it's already gone)
-    const filePath = path.join(UPLOAD_ROOT, String(req.user.id), file.storedName);
-    fs.unlink(filePath, () => {});
+    // Remove the physical files (current + old versions)
+    const userDir = path.join(UPLOAD_ROOT, String(req.user.id));
+    fs.unlink(path.join(userDir, file.storedName), () => {});
+    for (const v of file.versions) fs.unlink(path.join(userDir, v.storedName), () => {});
 
     return res.json({ message: 'File permanently deleted' });
   } catch (err) {
