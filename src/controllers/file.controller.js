@@ -3,6 +3,7 @@ const path = require('path');
 const prisma = require('../config/db');
 const logger = require('../utils/logger');
 const { isPreviewable, sendPreview } = require('../utils/preview');
+const { emitToUser } = require('../realtime/socket');
 
 const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads');
 
@@ -54,6 +55,7 @@ exports.upload = async (req, res) => {
       }),
     ]);
 
+    emitToUser(req.user.id, 'file:uploaded', file);
     return res.status(201).json({ message: 'File uploaded successfully', file });
   } catch (err) {
     // If the database failed, remove the file from disk so nothing is orphaned
@@ -144,6 +146,7 @@ exports.remove = async (req, res) => {
       data: { deletedAt: new Date() },
     });
 
+    emitToUser(req.user.id, 'file:trashed', { id: file.id });
     return res.json({ message: 'File moved to trash' });
   } catch (err) {
     logger.error(err.stack || err.message);
@@ -188,6 +191,7 @@ exports.restore = async (req, res) => {
       select: { id: true, name: true, folderId: true },
     });
 
+    emitToUser(req.user.id, 'file:restored', restored);
     return res.json({ message: 'File restored successfully', file: restored });
   } catch (err) {
     logger.error(err.stack || err.message);
@@ -227,6 +231,7 @@ exports.permanentDelete = async (req, res) => {
     fs.unlink(path.join(userDir, file.storedName), () => {});
     for (const v of file.versions) fs.unlink(path.join(userDir, v.storedName), () => {});
 
+    emitToUser(req.user.id, 'file:deleted', { id: file.id });
     return res.json({ message: 'File permanently deleted' });
   } catch (err) {
     logger.error(err.stack || err.message);
@@ -257,6 +262,7 @@ exports.rename = async (req, res) => {
       select: { id: true, name: true, folderId: true, updatedAt: true },
     });
 
+    emitToUser(req.user.id, 'file:renamed', updated);
     return res.json({ message: 'File renamed successfully', file: updated });
   } catch (err) {
     logger.error(err.stack || err.message);
@@ -296,6 +302,7 @@ exports.move = async (req, res) => {
       select: { id: true, name: true, folderId: true, updatedAt: true },
     });
 
+    emitToUser(req.user.id, 'file:moved', updated);
     return res.json({ message: 'File moved successfully', file: updated });
   } catch (err) {
     logger.error(err.stack || err.message);

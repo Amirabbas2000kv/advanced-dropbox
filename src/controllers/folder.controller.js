@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const prisma = require('../config/db');
 const logger = require('../utils/logger');
+const { emitToUser } = require('../realtime/socket');
 
 const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads');
 
@@ -47,6 +48,7 @@ exports.create = async (req, res) => {
       select: { id: true, name: true, parentId: true, createdAt: true },
     });
 
+    emitToUser(req.user.id, 'folder:created', folder);
     return res.status(201).json({ message: 'Folder created successfully', folder });
   } catch (err) {
     logger.error(err.stack || err.message);
@@ -249,6 +251,7 @@ exports.remove = async (req, res) => {
       fs.unlink(path.join(UPLOAD_ROOT, String(req.user.id), name), () => {});
     }
 
+    emitToUser(req.user.id, 'folder:deleted', { id: folder.id });
     return res.json({
       message: 'Folder deleted successfully',
       deletedFolders: folderIds.length,

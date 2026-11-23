@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const { once } = require('events');
 const prisma = require('../config/db');
 const uploadConfig = require('../config/upload.config');
+const { emitToUser } = require('../realtime/socket');
 
 const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads');
 const TMP_ROOT = path.join(UPLOAD_ROOT, '.tmp');
@@ -236,6 +237,7 @@ exports.complete = async (req, res) => {
     // Remove the temp chunks
     await fsp.rm(sessionDir(session.id), { recursive: true, force: true });
 
+    emitToUser(req.user.id, 'file:uploaded', file);
     return res.status(201).json({ message: 'File uploaded successfully', file });
   } catch (err) {
     if (finalPath) await fsp.unlink(finalPath).catch(() => {});

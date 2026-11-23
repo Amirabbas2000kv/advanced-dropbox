@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const prisma = require('../config/db');
 const logger = require('../utils/logger');
+const { emitToUser } = require('../realtime/socket');
 
 const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads');
 const MAX_OLD_VERSIONS = 5;
@@ -83,6 +84,7 @@ exports.upload = async (req, res) => {
       for (const v of extra) fs.unlink(diskPath(req.user.id, v.storedName), () => {});
     }
 
+    emitToUser(req.user.id, 'file:version', updated);
     return res.status(201).json({ message: 'New version uploaded', file: updated });
   } catch (err) {
     if (req.file) fs.unlink(req.file.path, () => {});
@@ -216,6 +218,7 @@ exports.restore = async (req, res) => {
         }),
       ]);
 
+      emitToUser(req.user.id, 'file:version', updated);
       return res.json({ message: `Restored content of version ${n} as a new version`, file: updated });
     } catch (err) {
       fs.unlink(diskPath(req.user.id, newStoredName), () => {});

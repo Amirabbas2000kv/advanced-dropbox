@@ -1,9 +1,15 @@
+const http = require('http');
 const app = require('./app');
 const config = require('./config/env');
 const logger = require('./utils/logger');
 const prisma = require('./config/db');
+const { initSocket } = require('./realtime/socket');
 
-const server = app.listen(config.port, () => {
+// Socket.IO needs the raw HTTP server, so we create it ourselves
+const server = http.createServer(app);
+initSocket(server);
+
+server.listen(config.port, () => {
   logger.info(`🚀 Server running on http://localhost:${config.port}`);
 });
 
