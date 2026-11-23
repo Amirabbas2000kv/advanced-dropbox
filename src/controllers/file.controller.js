@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const prisma = require('../config/db');
 const logger = require('../utils/logger');
+const { isPreviewable, sendPreview } = require('../utils/preview');
 
 const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads');
 
@@ -296,6 +297,31 @@ exports.move = async (req, res) => {
     });
 
     return res.json({ message: 'File moved successfully', file: updated });
+  } catch (err) {
+    logger.error(err.stack || err.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// GET /api/files/:id/preview  ->  show the file inside the browser
+exports.preview = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid file id' });
+    }
+
+    const file = await prisma.file.findFirst({
+      where: { id, userId: req.user.id, deletedAt: null },
+    });
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    if (!isPreviewable(file.mimeType)) {
+      return res.status(415).json({ error: 'This file type cannot be previewed. Download it instead' });
+    }
+
+    return sendPreview(res, req.user.id, file);
   } catch (err) {
     logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });

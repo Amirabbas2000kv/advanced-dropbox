@@ -1,6 +1,7 @@
 const path = require('path');
 const prisma = require('../config/db');
 const logger = require('../utils/logger');
+const { isPreviewable, sendPreview } = require('../utils/preview');
 
 const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads');
 const PERMISSIONS = ['read', 'edit'];
@@ -173,6 +174,26 @@ exports.rename = async (req, res) => {
     });
 
     return res.json({ message: 'File renamed successfully', file: updated });
+  } catch (err) {
+    logger.error(err.stack || err.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// GET /api/collab/files/:fileId/preview
+exports.preview = async (req, res) => {
+  try {
+    const fileId = Number(req.params.fileId);
+    const access = Number.isInteger(fileId) ? await findAccess(fileId, req.user.id) : null;
+    if (!access) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+    if (!isPreviewable(access.file.mimeType)) {
+      return res.status(415).json({ error: 'This file type cannot be previewed. Download it instead' });
+    }
+
+    // The file lives in the OWNER's folder
+    return sendPreview(res, access.file.userId, access.file);
   } catch (err) {
     logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });

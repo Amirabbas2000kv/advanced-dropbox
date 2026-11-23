@@ -19,6 +19,7 @@ router.get('/:id/versions', authMiddleware, versionController.list);
 router.get('/:id/versions/:n/download', authMiddleware, versionController.download);
 router.post('/:id/versions/:n/restore', authMiddleware, versionController.restore);
 
+router.get('/:id/preview', authMiddleware, fileController.preview);
 router.get('/:id/download', authMiddleware, fileController.download);
 router.post('/:id/restore', authMiddleware, fileController.restore);
 router.delete('/:id/permanent', authMiddleware, fileController.permanentDelete);
