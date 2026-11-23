@@ -11,6 +11,7 @@ const searchRoutes = require('./routes/search.routes');
 const shareRoutes = require('./routes/share.routes');
 const collabRoutes = require('./routes/collab.routes');
 const shareController = require('./controllers/share.controller');
+const { apiLimiter } = require('./middlewares/rate-limit.middleware');
 const { notFound, errorHandler } = require('./middlewares/error.middleware');
 
 const app = express();
@@ -23,6 +24,7 @@ app.use(
     stream: { write: (message) => logger.http(message.trim()) },
   })
 );
+app.use('/api', apiLimiter);
 app.use(express.json());
 
 // Health check route
