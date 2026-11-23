@@ -9,6 +9,7 @@ const folderRoutes = require('./routes/folder.routes');
 const chunkRoutes = require('./routes/chunk.routes');
 const searchRoutes = require('./routes/search.routes');
 const shareRoutes = require('./routes/share.routes');
+const collabRoutes = require('./routes/collab.routes');
 const shareController = require('./controllers/share.controller');
 const { notFound, errorHandler } = require('./middlewares/error.middleware');
 
@@ -43,6 +44,7 @@ app.use('/api/folders', folderRoutes);
 app.use('/api/uploads', chunkRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/shares', shareRoutes);
+app.use('/api/collab', collabRoutes);
 
 // 404 handler, then the central error handler (MUST be last)
 app.use(notFound);

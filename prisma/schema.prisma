@@ -20,6 +20,8 @@ model User {
   folders        Folder[]
   uploadSessions UploadSession[]
   shareLinks     ShareLink[]
+  sharesGiven    FileShare[]     @relation("SharesGiven")
+  sharesReceived FileShare[]     @relation("SharesReceived")
 }
 
 model Folder {
@@ -53,6 +55,7 @@ model File {
   updatedAt      DateTime      @updatedAt
   shareLinks     ShareLink[]
   versions       FileVersion[]
+  fileShares     FileShare[]
 
   @@index([userId, folderId])
   @@index([userId, deletedAt])
@@ -98,4 +101,20 @@ model ShareLink {
   createdAt     DateTime  @default(now())
 
   @@index([userId])
+}
+
+model FileShare {
+  id          Int      @id @default(autoincrement())
+  fileId      Int
+  file        File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  ownerId     Int
+  owner       User     @relation("SharesGiven", fields: [ownerId], references: [id], onDelete: Cascade)
+  recipientId Int
+  recipient   User     @relation("SharesReceived", fields: [recipientId], references: [id], onDelete: Cascade)
+  permission  String   @default("read")
+  createdAt   DateTime @default(now())
+
+  @@unique([fileId, recipientId])
+  @@index([recipientId])
+  @@index([ownerId])
 }
