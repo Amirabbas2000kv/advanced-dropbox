@@ -1,42 +1,68 @@
-import { useEffect, useState } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
 
-export default function App() {
-  // status: 'loading' | 'ok' | 'error'
-  const [status, setStatus] = useState('loading');
-  const [info, setInfo] = useState(null);
+import { useAuth } from './context/AuthContext';
 
-  useEffect(() => {
-    fetch('/api/health')
-      .then((res) => {
-        if (!res.ok) throw new Error('Bad response');
-        return res.json();
-      })
-      .then((data) => {
-        setInfo(data);
-        setStatus('ok');
-      })
-      .catch(() => setStatus('error'));
-  }, []);
+import {
+  ProtectedRoute,
+  PublicOnlyRoute,
+  LoadingScreen,
+} from './components/RouteGuards';
+
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import DashboardPage from './pages/DashboardPage';
+
+function HomeRedirect() {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   return (
-    <div className="page">
-      <h1>📦 Advanced Dropbox</h1>
+    <Navigate
+      to={isAuthenticated ? '/dashboard' : '/login'}
+      replace
+    />
+  );
+}
 
-      {status === 'loading' && (
-        <p className="box">Connecting to the server...</p>
-      )}
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<HomeRedirect />} />
 
-      {status === 'ok' && (
-        <p className="box ok">
-          ✅ Backend connected: {info.message}
-        </p>
-      )}
+      <Route
+        path="/login"
+        element={
+          <PublicOnlyRoute>
+            <LoginPage />
+          </PublicOnlyRoute>
+        }
+      />
 
-      {status === 'error' && (
-        <p className="box error">
-          ❌ Cannot reach the backend. Is it running on port 3000?
-        </p>
-      )}
-    </div>
+      <Route
+        path="/register"
+        element={
+          <PublicOnlyRoute>
+            <RegisterPage />
+          </PublicOnlyRoute>
+        }
+      />
+
+      <Route
+        path="/dashboard"
+        element={
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="*"
+        element={<Navigate to="/" replace />}
+      />
+    </Routes>
   );
 }
