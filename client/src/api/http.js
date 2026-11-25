@@ -31,7 +31,6 @@ export async function apiRequest(path, options = {}) {
 
   const headers = new Headers(customHeaders || {});
 
-  // Attach JWT only to authenticated requests.
   if (auth) {
     const token = getStoredToken();
 
@@ -40,17 +39,21 @@ export async function apiRequest(path, options = {}) {
     }
   }
 
-  // JSON is the default request format.
   const isFormData =
     typeof FormData !== 'undefined' &&
     fetchOptions.body instanceof FormData;
 
-  if (fetchOptions.body && !isFormData && !headers.has('Content-Type')) {
+  if (
+    fetchOptions.body &&
+    !isFormData &&
+    !headers.has('Content-Type')
+  ) {
     headers.set('Content-Type', 'application/json');
   }
 
   const response = await fetch(`${API_BASE}${path}`, {
     ...fetchOptions,
+    cache: 'no-store',
     headers,
   });
 
@@ -72,8 +75,6 @@ export async function apiRequest(path, options = {}) {
       data?.message ||
       `Request failed with status ${response.status}`;
 
-    // An authenticated request with status 401 means
-    // the current session is no longer valid.
     if (response.status === 401 && auth) {
       window.dispatchEvent(new Event('auth:unauthorized'));
     }
