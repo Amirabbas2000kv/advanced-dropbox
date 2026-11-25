@@ -2,10 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
+
 import {
   getFolderContents,
   getStorageUsage,
 } from '../api/workspace';
+
+import FileUploader from '../components/FileUploader';
 
 import './DashboardPage.css';
 
@@ -84,8 +87,6 @@ export default function DashboardPage() {
         getStorageUsage(),
       ]);
 
-      // Build the complete folder path from the current folder
-      // back to the root.
       const folderPath = [];
 
       if (content.current) {
@@ -106,15 +107,11 @@ export default function DashboardPage() {
         ) {
           const parentKey = String(parentId);
 
-          if (visited.has(parentKey)) {
-            break;
-          }
+          if (visited.has(parentKey)) break;
 
           const parentContent = await getFolderContents(parentId);
 
-          if (!parentContent.current) {
-            break;
-          }
+          if (!parentContent.current) break;
 
           const parent = parentContent.current;
 
@@ -127,7 +124,6 @@ export default function DashboardPage() {
         folderPath.push(...reversePath.reverse());
       }
 
-      // Ignore outdated responses when the user navigates quickly.
       if (requestId !== requestSequence.current) {
         return;
       }
@@ -198,8 +194,6 @@ export default function DashboardPage() {
   return (
     <div className="workspace-shell">
 
-      {/* Sidebar */}
-
       <aside className="workspace-sidebar">
 
         <div className="workspace-brand">
@@ -243,9 +237,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="storage-details">
-                <strong>
-                  {formatBytes(usedStorage)}
-                </strong>
+                <strong>{formatBytes(usedStorage)}</strong>
 
                 <span>
                   of {formatBytes(storageLimit)}
@@ -287,8 +279,6 @@ export default function DashboardPage() {
 
       </aside>
 
-      {/* Main Content */}
-
       <main className="workspace-main">
 
         <header className="workspace-topbar">
@@ -298,9 +288,7 @@ export default function DashboardPage() {
             aria-label="Folder navigation"
           >
 
-            <button
-              onClick={() => loadWorkspace(null)}
-            >
+            <button onClick={() => loadWorkspace(null)}>
               My Files
             </button>
 
@@ -331,7 +319,9 @@ export default function DashboardPage() {
 
           <button
             className="refresh-button"
-            onClick={() => loadWorkspace(currentFolder?.id ?? null)}
+            onClick={() =>
+              loadWorkspace(currentFolder?.id ?? null)
+            }
             disabled={loading}
             title="Refresh workspace"
           >
@@ -380,14 +370,21 @@ export default function DashboardPage() {
 
           </section>
 
+          {!error && (
+            <FileUploader
+              folderId={currentFolder?.id ?? null}
+              onUploaded={() =>
+                loadWorkspace(currentFolder?.id ?? null)
+              }
+            />
+          )}
+
           {error && (
             <div className="workspace-error">
               <span>⚠</span>
               <span>{error}</span>
 
-              <button
-                onClick={() => loadWorkspace(null)}
-              >
+              <button onClick={() => loadWorkspace(null)}>
                 Back to My Files
               </button>
             </div>
@@ -400,8 +397,6 @@ export default function DashboardPage() {
             </div>
           ) : !error ? (
             <>
-
-              {/* Folder Section */}
 
               <section className="items-section">
 
@@ -419,7 +414,6 @@ export default function DashboardPage() {
                         key={folder.id}
                         onClick={() => loadWorkspace(folder.id)}
                       >
-
                         <span className="folder-card-icon">
                           📁
                         </span>
@@ -431,7 +425,6 @@ export default function DashboardPage() {
                         <span className="folder-card-arrow">
                           →
                         </span>
-
                       </button>
                     ))}
 
@@ -447,8 +440,6 @@ export default function DashboardPage() {
                 )}
 
               </section>
-
-              {/* File Section */}
 
               <section className="items-section files-section">
 
