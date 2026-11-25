@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../context/AuthContext';
@@ -8,9 +14,22 @@ import {
   getStorageUsage,
 } from '../api/workspace';
 
+import {
+  createFolder,
+  renameFile,
+  moveFile,
+  deleteFile,
+  renameFolder,
+  moveFolder,
+  deleteFolder,
+  getFolderTargets,
+} from '../api/itemActions';
+
 import FileUploader from '../components/FileUploader';
+import ItemActionDialog from '../components/ItemActionDialog';
 
 import './DashboardPage.css';
+import '../components/ItemActions.css';
 
 function formatBytes(bytes) {
   const value = Number(bytes);
@@ -74,6 +93,11 @@ export default function DashboardPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const [notice, setNotice] = useState('');
+
+  const [contextMenu, setContextMenu] = useState(null);
+  const [dialog, setDialog] = useState(null);
 
   const loadWorkspace = useCallback(async (folderId = null) => {
     const requestId = ++requestSequence.current;
@@ -175,6 +199,146 @@ export default function DashboardPage() {
     });
   }
 
+  function openContextMenu(event, item, type) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const menuWidth = 205;
+    const menuHeight = 175;
+
+    const x = Math.max(
+      8,
+      Math.min(
+        event.clientX,
+        window.innerWidth - menuWidth - 8
+      )
+    );
+
+    const y = Math.max(
+      8,
+      Math.min(
+        event.clientY,
+        window.innerHeight - menuHeight - 8
+      )
+    );
+
+    setContextMenu({
+      item,
+      type,
+      x,
+      y,
+    });
+  }
+
+  async function openActionDialog(action, type, item = null) {
+    setContextMenu(null);
+
+    const key = `${Date.now()}-${action}-${type}-${item?.id ?? 'new'}`;
+
+    const nextDialog = {
+      key,
+      action,
+      type,
+      item,
+      parentFolderId: currentFolder?.id ?? null,
+      folders: [],
+      loadingFolders: action === 'move',
+      foldersError: '',
+    };
+
+    setDialog(nextDialog);
+
+    if (action !== 'move') {
+      return;
+    }
+
+    try {
+      const targets = await getFolderTargets(
+        type === 'folder' ? item.id : null
+      );
+
+      setDialog((current) => {
+        if (!current || current.key !== key) {
+          return current;
+        }
+
+        return {
+          ...current,
+          folders: targets,
+          loadingFolders: false,
+        };
+      });
+    } catch (err) {
+      setDialog((current) => {
+        if (!current || current.key !== key) {
+          return current;
+        }
+
+        return {
+          ...current,
+          loadingFolders: false,
+          foldersError:
+            err.message || 'Could not load destination folders.',
+        };
+      });
+    }
+  }
+
+  async function handleActionConfirm(value) {
+    if (!dialog) return;
+
+    const { action, type, item } = dialog;
+
+    if (action === 'create') {
+      await createFolder(
+        value,
+        currentFolder?.id ?? null
+      );
+
+      setNotice('Folder created successfully.');
+    }
+
+    if (action === 'rename') {
+      if (type === 'file') {
+        await renameFile(item.id, value);
+      } else {
+        await renameFolder(item.id, value);
+      }
+
+      setNotice(
+        `${type === 'file' ? 'File' : 'Folder'} renamed successfully.`
+      );
+    }
+
+    if (action === 'move') {
+      if (type === 'file') {
+        await moveFile(item.id, value);
+      } else {
+        await moveFolder(item.id, value);
+      }
+
+      setNotice(
+        `${type === 'file' ? 'File' : 'Folder'} moved successfully.`
+      );
+    }
+
+    if (action === 'delete') {
+      if (type === 'file') {
+        await deleteFile(item.id);
+        setNotice('File moved to Trash successfully.');
+      } else {
+        await deleteFolder(item.id);
+        setNotice('Folder and its contents permanently deleted.');
+      }
+    }
+
+    setDialog(null);
+
+    await loadWorkspace(
+      currentFolder?.id ?? null
+    );
+  }
+
   const usedStorage = Number(storage?.used || 0);
   const storageLimit = Number(storage?.limit || 0);
 
@@ -193,6 +357,8 @@ export default function DashboardPage() {
 
   return (
     <div className="workspace-shell">
+
+      {/* Sidebar */}
 
       <aside className="workspace-sidebar">
 
@@ -279,6 +445,8 @@ export default function DashboardPage() {
 
       </aside>
 
+      {/* Main Content */}
+
       <main className="workspace-main">
 
         <header className="workspace-topbar">
@@ -288,7 +456,9 @@ export default function DashboardPage() {
             aria-label="Folder navigation"
           >
 
-            <button onClick={() => loadWorkspace(null)}>
+            <button
+              onClick={() => loadWorkspace(null)}
+            >
               My Files
             </button>
 
@@ -348,27 +518,55 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <div className="workspace-counts">
+            <div className="workspace-heading-actions">
 
-              <div className="count-card">
-                <span>📁</span>
-                <div>
-                  <strong>{folders.length}</strong>
-                  <small>Folders</small>
+              <div className="workspace-counts">
+
+                <div className="count-card">
+                  <span>📁</span>
+
+                  <div>
+                    <strong>{folders.length}</strong>
+                    <small>Folders</small>
+                  </div>
                 </div>
+
+                <div className="count-card">
+                  <span>📄</span>
+
+                  <div>
+                    <strong>{files.length}</strong>
+                    <small>Files</small>
+                  </div>
+                </div>
+
               </div>
 
-              <div className="count-card">
-                <span>📄</span>
-                <div>
-                  <strong>{files.length}</strong>
-                  <small>Files</small>
-                </div>
-              </div>
+              <button
+                className="new-folder-button"
+                onClick={() =>
+                  openActionDialog('create', 'folder')
+                }
+              >
+                + New folder
+              </button>
 
             </div>
 
           </section>
+
+          {notice && (
+            <div className="workspace-notice" role="status">
+              <span>✓ {notice}</span>
+
+              <button
+                onClick={() => setNotice('')}
+                aria-label="Dismiss notification"
+              >
+                ×
+              </button>
+            </div>
+          )}
 
           {!error && (
             <FileUploader
@@ -398,6 +596,8 @@ export default function DashboardPage() {
           ) : !error ? (
             <>
 
+              {/* Folder Section */}
+
               <section className="items-section">
 
                 <div className="section-heading">
@@ -409,37 +609,61 @@ export default function DashboardPage() {
                   <div className="folder-grid">
 
                     {folders.map((folder) => (
-                      <button
+                      <article
                         className="folder-card"
                         key={folder.id}
-                        onClick={() => loadWorkspace(folder.id)}
+                        onContextMenu={(event) =>
+                          openContextMenu(event, folder, 'folder')
+                        }
                       >
-                        <span className="folder-card-icon">
-                          📁
-                        </span>
 
-                        <span className="folder-card-name">
-                          {folder.name}
-                        </span>
+                        <button
+                          className="folder-card-open"
+                          onClick={() =>
+                            loadWorkspace(folder.id)
+                          }
+                          title={`Open ${folder.name}`}
+                        >
+                          <span className="folder-card-icon">
+                            📁
+                          </span>
 
-                        <span className="folder-card-arrow">
-                          →
-                        </span>
-                      </button>
+                          <span className="folder-card-name">
+                            {folder.name}
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          className="item-menu-trigger"
+                          aria-label={`More actions for ${folder.name}`}
+                          aria-haspopup="menu"
+                          onClick={(event) =>
+                            openContextMenu(event, folder, 'folder')
+                          }
+                        >
+                          ⋮
+                        </button>
+
+                      </article>
                     ))}
 
                   </div>
                 ) : (
                   <div className="empty-state">
                     <span>📂</span>
+
                     <strong>No folders yet</strong>
+
                     <p>
-                      Folders will appear here when available.
+                      Create a folder to organize your files.
                     </p>
                   </div>
                 )}
 
               </section>
+
+              {/* File Section */}
 
               <section className="items-section files-section">
 
@@ -458,12 +682,18 @@ export default function DashboardPage() {
                           <th>Name</th>
                           <th>File size</th>
                           <th>Date added</th>
+                          <th>Actions</th>
                         </tr>
                       </thead>
 
                       <tbody>
                         {files.map((file) => (
-                          <tr key={file.id}>
+                          <tr
+                            key={file.id}
+                            onContextMenu={(event) =>
+                              openContextMenu(event, file, 'file')
+                            }
+                          >
 
                             <td>
                               <div className="file-name-cell">
@@ -487,6 +717,20 @@ export default function DashboardPage() {
                               {formatDate(file.createdAt)}
                             </td>
 
+                            <td className="file-actions-cell">
+                              <button
+                                type="button"
+                                className="item-menu-trigger"
+                                aria-label={`More actions for ${file.name}`}
+                                aria-haspopup="menu"
+                                onClick={(event) =>
+                                  openContextMenu(event, file, 'file')
+                                }
+                              >
+                                ⋮
+                              </button>
+                            </td>
+
                           </tr>
                         ))}
                       </tbody>
@@ -497,7 +741,9 @@ export default function DashboardPage() {
                 ) : (
                   <div className="empty-state">
                     <span>📄</span>
+
                     <strong>No files yet</strong>
+
                     <p>
                       Your uploaded files will appear here.
                     </p>
@@ -516,6 +762,91 @@ export default function DashboardPage() {
         </div>
 
       </main>
+
+      {/* Context Menu */}
+
+      {contextMenu && (
+        <>
+          <button
+            type="button"
+            className="item-menu-backdrop"
+            aria-label="Close context menu"
+            onClick={() => setContextMenu(null)}
+          />
+
+          <div
+            className="item-context-menu"
+            role="menu"
+            style={{
+              left: contextMenu.x,
+              top: contextMenu.y,
+            }}
+          >
+
+            <p>
+              {contextMenu.item.name}
+            </p>
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() =>
+                openActionDialog(
+                  'rename',
+                  contextMenu.type,
+                  contextMenu.item
+                )
+              }
+            >
+              <span>✎</span>
+              Rename
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() =>
+                openActionDialog(
+                  'move',
+                  contextMenu.type,
+                  contextMenu.item
+                )
+              }
+            >
+              <span>↗</span>
+              Move to...
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              className="menu-delete"
+              onClick={() =>
+                openActionDialog(
+                  'delete',
+                  contextMenu.type,
+                  contextMenu.item
+                )
+              }
+            >
+              <span>⌫</span>
+
+              {contextMenu.type === 'file'
+                ? 'Move to Trash'
+                : 'Delete permanently'}
+            </button>
+
+          </div>
+        </>
+      )}
+
+      {/* Action Dialog */}
+
+      <ItemActionDialog
+        dialog={dialog}
+        onClose={() => setDialog(null)}
+        onConfirm={handleActionConfirm}
+      />
 
     </div>
   );

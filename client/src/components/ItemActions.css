@@ -1,0 +1,360 @@
+/* Item context menu */
+
+.folder-card {
+  position: relative;
+  min-width: 0;
+  cursor: default;
+}
+
+.folder-card-open {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item-menu-trigger {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #8290a5;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.item-menu-trigger:hover {
+  background: #edf4ff;
+  color: #2563eb;
+}
+
+.file-actions-cell {
+  width: 55px;
+  text-align: center !important;
+}
+
+.item-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: default;
+}
+
+.item-context-menu {
+  position: fixed;
+  z-index: 1001;
+  width: 190px;
+  padding: 7px;
+  border: 1px solid #e5eaf2;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 15px 45px rgba(20, 35, 70, 0.16);
+}
+
+.item-context-menu p {
+  margin: 5px 9px 7px;
+  overflow: hidden;
+  color: #97a1b1;
+  font-size: 10px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item-context-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 9px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #42516a;
+  font-size: 12px;
+  text-align: left;
+}
+
+.item-context-menu button:hover {
+  background: #f1f5fb;
+}
+
+.item-context-menu button.menu-delete {
+  color: #dc2626;
+}
+
+.item-context-menu button.menu-delete:hover {
+  background: #fef2f2;
+}
+
+/* New folder button */
+
+.workspace-heading-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.new-folder-button {
+  height: 39px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: white;
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.new-folder-button:hover {
+  background: #1d4ed8;
+}
+
+/* Feedback message */
+
+.workspace-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 12px 15px;
+  border: 1px solid #bbf7d0;
+  border-radius: 9px;
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 12px;
+}
+
+.workspace-notice button {
+  border: none;
+  background: transparent;
+  color: #166534;
+  font-size: 18px;
+}
+
+/* Action dialog */
+
+.action-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(3px);
+}
+
+.action-dialog {
+  width: 100%;
+  max-width: 440px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 25px;
+  border: 1px solid #e8edf5;
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 25px 80px rgba(15, 23, 42, 0.2);
+}
+
+.action-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 15px;
+  margin-bottom: 27px;
+}
+
+.action-dialog-eyebrow {
+  margin: 0 0 8px;
+  color: #3975df;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.6px;
+}
+
+.action-dialog-header h2 {
+  margin: 0;
+  color: #26344a;
+  font-size: 21px;
+  letter-spacing: -0.5px;
+}
+
+.dialog-close {
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 7px;
+  background: #f1f5f9;
+  color: #718096;
+  font-size: 21px;
+}
+
+.dialog-close:hover {
+  background: #e2e8f0;
+}
+
+.dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-bottom: 20px;
+}
+
+.dialog-field label {
+  color: #42516a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dialog-field input,
+.dialog-field select {
+  width: 100%;
+  height: 45px;
+  padding: 0 12px;
+  border: 1px solid #dfe5ee;
+  border-radius: 8px;
+  background: white;
+  color: #344054;
+  outline: none;
+  font: inherit;
+  font-size: 12px;
+}
+
+.dialog-field input:focus,
+.dialog-field select:focus {
+  border-color: #3975ef;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.dialog-loading,
+.dialog-hint {
+  margin: 0;
+  color: #8793a6;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.delete-warning {
+  margin-bottom: 21px;
+  padding: 17px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fff7f7;
+}
+
+.delete-warning-icon {
+  margin-bottom: 9px;
+  color: #dc2626;
+  font-size: 23px;
+}
+
+.delete-warning strong {
+  display: block;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.delete-warning p {
+  margin: 9px 0 0;
+  color: #994b4b;
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.dialog-form-error,
+.dialog-error {
+  margin-bottom: 16px;
+  padding: 11px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.action-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.action-dialog-footer button {
+  min-height: 40px;
+  padding: 0 15px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.dialog-cancel-button {
+  border: 1px solid #e0e6ef;
+  background: white;
+  color: #64748b;
+}
+
+.dialog-cancel-button:hover:not(:disabled) {
+  background: #f8fafc;
+}
+
+.dialog-confirm-button {
+  border: none;
+  background: #2563eb;
+  color: white;
+}
+
+.dialog-confirm-button:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.dialog-danger-button {
+  border: none;
+  background: #dc2626;
+  color: white;
+}
+
+.dialog-danger-button:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.action-dialog-footer button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 520px) {
+  .action-dialog {
+    padding: 19px;
+  }
+
+  .workspace-heading-actions {
+    width: 100%;
+  }
+
+  .workspace-heading-actions .workspace-counts {
+    order: 2;
+  }
+
+  .new-folder-button {
+    order: 1;
+  }
+}
