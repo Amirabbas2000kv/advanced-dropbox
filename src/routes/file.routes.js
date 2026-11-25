@@ -4,17 +4,18 @@ const versionController = require('../controllers/version.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
 const uploadMiddleware = require('../middlewares/upload.middleware');
 const versionUploadMiddleware = require('../middlewares/version-upload.middleware');
+const contentCheck = require('../middlewares/content-check.middleware');
 
 const router = express.Router();
 
 // Fixed paths first, then paths with parameters
-router.post('/upload', authMiddleware, uploadMiddleware, fileController.upload);
+router.post('/upload', authMiddleware, uploadMiddleware, contentCheck, fileController.upload);
 router.get('/', authMiddleware, fileController.list);
 router.get('/storage', authMiddleware, fileController.storage);
 router.get('/trash', authMiddleware, fileController.trash);
 
 // Versions
-router.post('/:id/versions', authMiddleware, versionUploadMiddleware, versionController.upload);
+router.post('/:id/versions', authMiddleware, versionUploadMiddleware, contentCheck, versionController.upload);
 router.get('/:id/versions', authMiddleware, versionController.list);
 router.get('/:id/versions/:n/download', authMiddleware, versionController.download);
 router.post('/:id/versions/:n/restore', authMiddleware, versionController.restore);

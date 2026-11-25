@@ -2,6 +2,12 @@
 const BASE = 'http://localhost:3000/api';
 const PASSWORD = '12345678';
 
+// A tiny valid 1x1 PNG image (the server now checks the real content)
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64'
+);
+
 const check = (label, ok) => {
   console.log(`${ok ? '✅' : '❌'} ${label}`);
   if (!ok) process.exitCode = 1;
@@ -39,7 +45,7 @@ async function main() {
   const hacker = await login('hacker@example.com');
 
   const id1 = await upload(auth, 'zebra-report.txt', 'text/plain', 'hello');
-  const id2 = await upload(auth, 'zebra-photo.png', 'image/png', 'fakepng');
+  const id2 = await upload(auth, 'zebra-photo.png', 'image/png', PNG);
 
   // Text search
   let r = await search('q=zebra', auth);

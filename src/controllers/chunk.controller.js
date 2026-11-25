@@ -5,6 +5,8 @@ const crypto = require('crypto');
 const { once } = require('events');
 const prisma = require('../config/db');
 const uploadConfig = require('../config/upload.config');
+const logger = require('../utils/logger');
+const { inspectFile, resolveMime } = require('../utils/fileType');
 const { emitToUser } = require('../realtime/socket');
 
 const UPLOAD_ROOT = path.join(__dirname, '..', '..', 'uploads');
@@ -92,7 +94,7 @@ exports.init = async (req, res) => {
 
     return res.status(201).json({ uploadId: id, chunkSize, totalChunks });
   } catch (err) {
-    console.error('Init upload error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -128,7 +130,7 @@ exports.uploadChunk = async (req, res) => {
 
     return res.json({ message: 'Chunk received', index });
   } catch (err) {
-    console.error('Upload chunk error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -150,7 +152,7 @@ exports.status = async (req, res) => {
       remaining: session.totalChunks - received.length,
     });
   } catch (err) {
-    console.error('Upload status error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -211,8 +213,22 @@ exports.complete = async (req, res) => {
     const stat = await fsp.stat(finalPath);
     if (stat.size !== session.totalSize) {
       await fsp.unlink(finalPath).catch(() => {});
+      finalPath = null;
       return res.status(400).json({ error: 'Merged file size does not match the declared size' });
     }
+
+    // Check the REAL content of the merged file (magic bytes)
+    const inspected = await inspectFile(finalPath, session.fileName);
+    if (!inspected.ok) {
+      await fsp.unlink(finalPath).catch(() => {});
+      finalPath = null;
+      // The upload is bad, so close the session and delete the temp chunks too
+      await fsp.rm(sessionDir(session.id), { recursive: true, force: true });
+      await prisma.uploadSession.delete({ where: { id: session.id } });
+      logger.warn(`Rejected chunked upload "${session.fileName}" (user ${req.user.id}): ${inspected.reason}`);
+      return res.status(415).json({ error: inspected.reason });
+    }
+    const mimeType = resolveMime(inspected, session.mimeType);
 
     // Save the record, update storage and close the session in ONE transaction
     const [file] = await prisma.$transaction([
@@ -220,7 +236,7 @@ exports.complete = async (req, res) => {
         data: {
           name: session.fileName,
           storedName,
-          mimeType: session.mimeType,
+          mimeType,
           size: session.totalSize,
           userId: req.user.id,
           folderId: session.folderId,
@@ -241,7 +257,7 @@ exports.complete = async (req, res) => {
     return res.status(201).json({ message: 'File uploaded successfully', file });
   } catch (err) {
     if (finalPath) await fsp.unlink(finalPath).catch(() => {});
-    console.error('Complete upload error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
@@ -259,7 +275,7 @@ exports.abort = async (req, res) => {
 
     return res.json({ message: 'Upload cancelled' });
   } catch (err) {
-    console.error('Abort upload error:', err);
+    logger.error(err.stack || err.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 };
